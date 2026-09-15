@@ -1,0 +1,50 @@
+# Continuous Integration: every push and every pull request runs the linter and the
+# tests on a clean Ubuntu machine. If it passes here, it is not "works on my machine".
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (lint + tests)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        # Every `run:` step below starts in backend/, so the commands match exactly
+        # what you type locally.
+        working-directory: backend
+
+    env:
+      # config.py requires DATABASE_URL and refuses to start without it. CI has no .env
+      # file (it is gitignored, correctly), so we supply the value here. Nothing secret:
+      # the current tests never open a connection. When Phase 2 adds tests that really
+      # query the database, this gets replaced by a `services: postgres:` block.
+      DATABASE_URL: postgresql+psycopg://bookit:bookit@localhost:5432/bookit
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff check)
+        run: ruff check .
+
+      - name: Check formatting (ruff format)
+        run: ruff format --check .
+
+      - name: Run tests
+        run: pytest

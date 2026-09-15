@@ -1,0 +1,42 @@
+# Local development database.
+#
+# Only PostgreSQL runs in Docker. The FastAPI app runs directly on your machine with
+# `uvicorn --reload`, because editing code and seeing it reload instantly is much nicer
+# than rebuilding a container on every keystroke.
+#
+#   docker compose up -d     start the database in the background
+#   docker compose ps        is it running and healthy?
+#   docker compose logs db   what is it saying?
+#   docker compose down      stop it (data is KEPT in the volume)
+#   docker compose down -v   stop it and DELETE all data
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bookit-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bookit
+      POSTGRES_PASSWORD: bookit
+      POSTGRES_DB: bookit
+    ports:
+      # host:container — this machine already runs native PostgreSQL 15 on 5432 and 18 on
+      # 5433, so we publish on 15432 — deliberately outside the 5432-5434 range that
+      # Postgres installers claim. Inside the container it still listens on 5432.
+      - "15432:5432"
+    volumes:
+      - bookit-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Docker runs this repeatedly; the container is "healthy" once it passes.
+      # Postgres accepts TCP connections a second or two before it is ready to answer
+      # queries, so without this we would get confusing errors on a fresh start.
+      test: ["CMD-SHELL", "pg_isready -U bookit -d bookit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  # A named volume: the actual database files, living outside the container. This is
+  # what lets you delete and recreate the container without losing your data.
+  bookit-pgdata:

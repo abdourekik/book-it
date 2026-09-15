@@ -1,0 +1,6 @@
+# Development dependencies: what we need to test and lint, but the server does not.
+-r requirements.txt
+
+pytest>=8.3,<9.0
+httpx2>=2.13,<3.0
+ruff>=0.7,<1.0

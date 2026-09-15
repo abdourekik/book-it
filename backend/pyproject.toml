@@ -1,0 +1,41 @@
+# Configuration for the backend's tools. One file instead of .ruffrc + pytest.ini +
+# setup.cfg scattered around — this is the modern Python convention.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Never lint or reformat the virtual environment or migration scaffolding.
+extend-exclude = [".venv", "alembic/versions"]
+
+[tool.ruff.lint]
+# Each two-letter code is a family of rules. Start strict but not punishing; we can
+# add families later as the codebase (and your Python) matures.
+select = [
+    "E",   # pycodestyle errors   - spacing, indentation
+    "W",   # pycodestyle warnings - trailing whitespace
+    "F",   # pyflakes             - unused imports, undefined names
+    "I",   # isort                - import order, kept sorted automatically
+    "UP",  # pyupgrade            - "you can write this the modern way now"
+    "B",   # flake8-bugbear       - likely bugs, e.g. mutable default arguments
+    "SIM", # flake8-simplify      - needlessly convoluted logic
+    "N",   # pep8-naming          - snake_case functions, PascalCase classes
+]
+
+[tool.ruff.lint.isort]
+# Tell ruff that `app` is our own code, so our imports sort into their own block
+# below third-party ones.
+known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Makes `from app.main import app` work when pytest runs from the backend/ folder.
+pythonpath = ["."]
+addopts = [
+    "-v",                 # show each test name rather than a row of dots
+    "--strict-markers",   # a typo'd @pytest.mark.foo becomes an error, not a silent no-op
+]
+filterwarnings = [
+    # Noise from inside starlette's own test client, not from our code. Targeted on
+    # purpose: a blanket "ignore all warnings" would also hide warnings we should act on.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
