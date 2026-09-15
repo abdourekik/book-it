@@ -1,12 +1,14 @@
 # Book-it
 
+[![CI](https://github.com/abdourekik/book-it/actions/workflows/ci.yml/badge.svg)](https://github.com/abdourekik/book-it/actions/workflows/ci.yml)
+
 Appointment booking for small businesses. Barbers, clinics, and tutors publish their
 availability; customers pick a slot and book it in a few taps.
 
 > **Status: in development.** Backend skeleton and local database are running.
 > Booking logic, frontend, and deployment are not built yet. See [Roadmap](#roadmap).
 
-<!-- TODO once deployed: live link, demo GIF, CI and coverage badges -->
+<!-- TODO once deployed: live link, demo GIF, coverage badge -->
 
 **Live demo:** not deployed yet
 **Demo video:** not recorded yet
@@ -53,7 +55,7 @@ Full write-up with diagrams: **[docs/architecture.md](docs/architecture.md)**
 **Requirements:** Python 3.12, Docker Desktop, Git. (Node.js 20+ once the frontend exists.)
 
 ```bash
-git clone https://github.com/<your-username>/book-it.git
+git clone https://github.com/abdourekik/book-it.git
 cd book-it
 ```
 

@@ -2,7 +2,7 @@
 
 **Started:** 2026-09-15  
 **Target launch:** end of month 5  
-**Live URL:** not deployed yet  
+**Live URL:** not deployed yet (repo: https://github.com/abdourekik/book-it)  
 **Current phase:** Phase 1: Project setup
 
 ## Checklist
@@ -23,7 +23,7 @@
 - [x] PostgreSQL running with docker compose
 - [x] FastAPI "hello world" with health check endpoint
 - [x] Linting and formatting (ruff) and pytest configured
-- [ ] GitHub Actions CI running tests on every push (workflow written; unverified until pushed to GitHub)
+- [x] GitHub Actions CI running tests on every push
 - [x] README skeleton
 
 ### Phase 2: Data model (weeks 11-12)
