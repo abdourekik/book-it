@@ -29,7 +29,7 @@
 ### Phase 2: Data model (weeks 11-12)
 - [x] Models: User, Business, Service, AvailabilityRule, Booking (+ TimeOff)
 - [x] Alembic migrations working
-- [ ] Seed script with sample data
+- [x] Seed script with sample data
 - [x] Data model diagram in docs/
 
 ### Phase 3: Authentication (week 13)

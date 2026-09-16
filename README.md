@@ -90,7 +90,18 @@ alembic upgrade head
 This applies every migration in `backend/alembic/versions/` in order. Run it again after
 any `git pull` that brings new migrations.
 
-**4. Run the API**
+**4. Load sample data (optional but recommended)**
+
+```bash
+python -m scripts.seed
+```
+
+Creates two businesses in two different timezones, six services, weekly opening hours,
+and a handful of bookings. Re-run with `--reset` to wipe and start over. The script
+refuses to run unless `ENVIRONMENT` is a development value, and seeded accounts cannot
+log in.
+
+**5. Run the API**
 
 ```bash
 python -m uvicorn app.main:app --reload
