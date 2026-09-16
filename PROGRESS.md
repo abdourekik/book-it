@@ -30,7 +30,7 @@
 - [ ] Models: User, Business, Service, AvailabilityRule, Booking
 - [ ] Alembic migrations working
 - [ ] Seed script with sample data
-- [ ] Data model diagram in docs/
+- [x] Data model diagram in docs/
 
 ### Phase 3: Authentication (week 13)
 - [ ] Sign up and log in with hashed passwords
@@ -82,6 +82,22 @@
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->
+
+**2026-09-16: Data model decisions (see docs/data-model.md).**
+Four choices settled before writing any models. (1) Single role per user for v1 — a barber
+who books elsewhere needs a second account. (2) Availability is per business, not per
+service, to keep the Phase 4 slot algorithm tractable. (3) No fixed slot grid: slots are
+offered every free minute (`slot_interval_minutes` defaults to 1). Chosen against my
+recommendation of a 15-minute grid; stored as a column so it can be raised later without
+touching the algorithm. Note that 09:00-17:00 with a 30-minute service yields 451 offered
+start times, so the Phase 5 picker will need to handle a long list. (4) Guest booking is
+allowed: `customer_id` is nullable with `guest_name`/`guest_email` beside it, guarded by a
+CHECK constraint, plus a random `access_token` so guests can cancel via an emailed link.
+Better conversion, more edge cases in Phases 4 and 6.
+
+Double-booking will be prevented by a PostgreSQL EXCLUDE constraint using btree_gist
+(overlapping tstzrange per business, confirmed bookings only), not by a check-then-insert
+in Python, which has a race window between the check and the insert.
 
 **2026-09-16: Local Postgres container published on host port 15432, not 5432.**
 This machine already runs native PostgreSQL 15 (port 5432) and 18 (port 5433) as Windows
