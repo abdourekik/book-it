@@ -48,18 +48,18 @@
 
 ### Phase 5: Frontend (weeks 16-17)
 - [x] Public business page with service list and slot picker
-- [ ] Customer sign up, log in, and "my bookings" page (sign up, log in, and per-booking page done; a list of my bookings still to do)
-- [ ] Owner pages: services and availability management
-- [ ] Mobile-friendly layout, loading and error states
+- [x] Customer sign up, log in, and "my bookings" page
+- [x] Owner pages: services and availability management
+- [x] Mobile-friendly layout, loading and error states
 
 ### Phase 6: Email (week 18)
-- [ ] Booking confirmation email
-- [ ] Cancellation email
-- [ ] Reminder 24 hours before appointment
+- [x] Booking confirmation email
+- [x] Cancellation email
+- [x] Reminder 24 hours before appointment (hourly cron, idempotent)
 
 ### Phase 7: Owner dashboard (week 19)
-- [ ] Upcoming bookings list
-- [ ] Stats: bookings this week, cancellation rate, busiest day
+- [x] Upcoming bookings list
+- [x] Stats: bookings this week, cancellation rate, busiest day
 
 ### Phase 8: Launch (week 20)
 - [ ] Database on Supabase or Neon
@@ -79,6 +79,49 @@
 **Problems:** 
 **Next step:** 
 -->
+
+### 2026-09-16 | Phases 1-7 (Phase 8 prepared)
+**Done:** Built the whole application in one session. Project setup with Docker Postgres,
+ruff, pytest and GitHub Actions CI. Six-table data model with migrations and a two-timezone
+seed script. Authentication with argon2 and JWTs, role-protected routes. The availability
+engine and booking endpoints, including cancel and reschedule. Owner management for
+services, weekly hours and time off. A Next.js frontend: auth pages, the public booking
+page, my-bookings, and an owner dashboard. Transactional email with an hourly reminder job.
+Deployment blueprint, deployment guide, and demo script written. 163 backend tests, 95%
+coverage; frontend lint, typecheck and build clean.
+
+**Learned:**
+- An error message that contradicts what you believe about the system is a reason to check
+  the belief, not the message. "Password authentication failed" turned out to be two
+  processes bound to the same port and me talking to the wrong database entirely.
+- Coverage says a line ran; mutation testing says it matters. Breaking the slot engine seven
+  ways on purpose caught one genuinely weak spot the green suite had hidden.
+- Some correctness cannot live in application code. Double-booking is prevented by a
+  PostgreSQL exclusion constraint because the gap between "check if free" and "insert" is
+  where the bug lives, and no amount of careful Python closes it.
+- Storing a JWT in localStorage means one XSS bug is full account takeover. An httpOnly
+  cookie is invisible to JavaScript, which I confirmed by typing `document.cookie` into the
+  console while signed in and getting an empty string back.
+- The App Router's answer to "fetch when state changes" is usually "put the state in the
+  URL and let the server render it" - which removed an entire class of race conditions
+  along with the useEffect.
+
+**Problems:**
+- The concurrency test found a real bug in the booking endpoint: under load PostgreSQL
+  aborts the losers with deadlock_detected (40P01), not the exclusion violation I was
+  catching, so those requests would have returned 500 instead of a clean 409.
+- `verify_password` caught VerifyMismatchError but a malformed hash raises its parent
+  VerificationError, which would have turned a login into a 500. Caught by a test written
+  specifically to check that garbage fails closed.
+- Alembic autogenerate missed `CREATE EXTENSION btree_gist` and left the enum types behind
+  on downgrade, so the second upgrade failed. Both only surfaced by actually running the
+  migration up, down, and up again.
+- Two Next.js 16 rules cost a build each: a "use server" file may export only async
+  functions, and redirect() must sit outside try/catch because it works by throwing.
+
+**Next step:** Deploy. Database on Supabase or Neon, API on Render using render.yaml,
+frontend on Vercel - the checklist is in docs/deployment.md. Then record the demo, finish
+the README with a GIF and the live link, and publish the launch post.
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->

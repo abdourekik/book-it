@@ -116,6 +116,11 @@ class Booking(Base, TimestampMixin):
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
+    # When the 24-hour reminder was sent, or NULL if it has not been. This is what
+    # makes the reminder job safe to run repeatedly: it only ever picks up bookings
+    # where this is NULL, so a cron that fires twice does not email anyone twice.
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
     status: Mapped[BookingStatus] = mapped_column(
         Enum(
             BookingStatus,

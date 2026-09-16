@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { loginAction } from "../actions";
 import { AuthForm, AuthLink, Field } from "../AuthForm";
 
-export const metadata: Metadata = { title: "Sign in · Book-it" };
+export const metadata: Metadata = { title: "Sign in" };
 
 export default function LoginPage() {
   return (

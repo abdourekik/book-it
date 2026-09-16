@@ -18,7 +18,7 @@ type Props = { params: Promise<{ token: string }> };
 // Never cached or indexed: the URL is a secret, and a cached copy on a shared machine
 // would hand the next person the same power.
 export const metadata: Metadata = {
-  title: "Your booking · Book-it",
+  title: "Your booking",
   robots: { index: false, follow: false },
 };
 

@@ -128,6 +128,49 @@ export type SlotList = {
   slots: string[];
 };
 
+export type AvailabilityRule = {
+  id: number;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+};
+
+export type TimeOff = {
+  id: number;
+  starts_at: string;
+  ends_at: string;
+  reason: string | null;
+};
+
+export type Business = {
+  id: number;
+  name: string;
+  slug: string;
+  timezone: string;
+  description: string | null;
+  slot_interval_minutes: number;
+};
+
+export type OwnerService = Service & { is_active: boolean };
+
+export type OwnerBooking = {
+  id: number;
+  starts_at: string;
+  ends_at: string;
+  status: BookingStatus;
+  customer_name: string;
+  customer_email: string;
+  service_name: string;
+};
+
+export type Stats = {
+  bookings_this_week: number;
+  bookings_next_7_days: number;
+  cancellation_rate: number;
+  busiest_weekday: string | null;
+  total_bookings: number;
+};
+
 export type Booking = {
   id: number;
   starts_at: string;
@@ -180,4 +223,58 @@ export const api = {
     request<Booking>(`/bookings/${encodeURIComponent(bookingToken)}/cancel`, {
       method: "POST",
     }),
+
+  myBookings: (token: string) => request<Booking[]>("/my/bookings", { token }),
+
+  /* ------------------------------------------------------------ owner */
+
+  owner: {
+    business: (token: string) => request<Business>("/me/business", { token }),
+
+    createBusiness: (token: string, body: Record<string, unknown>) =>
+      request<Business>("/me/business", { method: "POST", body, token }),
+
+    updateBusiness: (token: string, body: Record<string, unknown>) =>
+      request<Business>("/me/business", { method: "PATCH", body, token }),
+
+    services: (token: string) => request<OwnerService[]>("/me/services", { token }),
+
+    createService: (token: string, body: Record<string, unknown>) =>
+      request<OwnerService>("/me/services", { method: "POST", body, token }),
+
+    updateService: (token: string, id: number, body: Record<string, unknown>) =>
+      request<OwnerService>(`/me/services/${id}`, { method: "PATCH", body, token }),
+
+    retireService: (token: string, id: number) =>
+      request<OwnerService>(`/me/services/${id}`, { method: "DELETE", token }),
+
+    availability: (token: string) =>
+      request<AvailabilityRule[]>("/me/availability", { token }),
+
+    replaceAvailability: (
+      token: string,
+      rules: { weekday: number; start_time: string; end_time: string }[],
+    ) =>
+      request<AvailabilityRule[]>("/me/availability", {
+        method: "PUT",
+        body: { rules },
+        token,
+      }),
+
+    timeOff: (token: string) => request<TimeOff[]>("/me/time-off", { token }),
+
+    createTimeOff: (token: string, body: Record<string, unknown>) =>
+      request<TimeOff>("/me/time-off", { method: "POST", body, token }),
+
+    deleteTimeOff: (token: string, id: number) =>
+      request<void>(`/me/time-off/${id}`, { method: "DELETE", token }),
+
+    bookings: (token: string, days = 7) =>
+      request<OwnerBooking[]>(`/me/bookings?days=${days}`, { token }),
+
+    stats: (token: string) => request<Stats>("/me/stats", { token }),
+
+    cancelBooking: (token: string, id: number) =>
+      request<OwnerBooking>(`/me/bookings/${id}/cancel`, { method: "POST", token }),
+  },
 };

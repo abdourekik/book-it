@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const business = await api.business(slug);
     return {
-      title: `Book with ${business.name} · Book-it`,
+      title: `Book with ${business.name}`,
       description: business.description ?? `Book an appointment with ${business.name}.`,
     };
   } catch {

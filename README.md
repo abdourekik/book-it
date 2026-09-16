@@ -5,9 +5,9 @@
 Appointment booking for small businesses. Barbers, clinics, and tutors publish their
 availability; customers pick a slot and book it in a few taps.
 
-> **Status: in development.** The backend API is complete — authentication, availability,
-> and booking with database-enforced protection against double-booking. The frontend and
-> deployment are not built yet. See [Roadmap](#roadmap).
+> **Status: feature complete, not yet deployed.** Backend, frontend, and email all work
+> end to end locally. Deployment is the remaining step — see
+> [docs/deployment.md](docs/deployment.md).
 
 <!-- TODO once deployed: live link, demo GIF, coverage badge -->
 
@@ -25,8 +25,8 @@ Planned for v1. Ticked items are built and tested.
 - [x] Customers see real available slots for a chosen service and date
 - [x] Customers book, cancel, and reschedule appointments
 - [x] Double-booking is impossible, even under simultaneous requests
-- [ ] Email confirmations, cancellations, and 24-hour reminders
-- [ ] Owner dashboard with upcoming bookings and simple stats
+- [x] Email confirmations, cancellations, and 24-hour reminders
+- [x] Owner dashboard with upcoming bookings and simple stats
 - [x] Correct across time zones — everything stored in UTC
 
 ## Tech stack
@@ -138,7 +138,10 @@ Start from `backend/.env.example`. **`.env` is gitignored and must never be comm
 | `GET` `POST` `PATCH` `DELETE` | `/me/services` | owners |
 | `GET` `PUT` | `/me/availability` | owners |
 | `GET` `POST` `DELETE` | `/me/time-off` | owners |
+| `GET` | `/me/bookings` · `/me/stats` | owners |
+| `POST` | `/me/bookings/{id}/cancel` | owners |
 | `GET` | `/businesses/{slug}` | anyone |
+| `GET` | `/my/bookings` | signed-in customers |
 
 Full interactive docs at `/docs` when the server is running.
 
@@ -179,9 +182,15 @@ CI runs all three on every push and pull request — see
 
 ## Deployment
 
-<!-- TODO: fill in during Phase 8 -->
-Not deployed yet. Planned: database on Supabase or Neon, backend on Render, frontend on
-Vercel, with migrations run as a release step.
+Not deployed yet. Everything needed is prepared:
+
+- [`render.yaml`](render.yaml) — blueprint for the API and the hourly reminder job
+- [`docs/deployment.md`](docs/deployment.md) — step-by-step guide, smoke test, and a
+  troubleshooting table
+
+Database on Supabase or Neon, backend on Render, frontend on Vercel. Migrations run as a
+`preDeployCommand`, so the schema is updated exactly once per release, immediately before
+traffic switches over.
 
 ## Roadmap
 
@@ -191,12 +200,35 @@ Vercel, with migrations run as a release step.
 | 2 | Data model and migrations | done |
 | 3 | Authentication and roles | done |
 | 4 | Availability and booking logic | done |
-| 5 | Frontend | in progress |
-| 6 | Email notifications | planned |
-| 7 | Owner dashboard | planned |
-| 8 | Deployment and polish | planned |
+| 5 | Frontend | done |
+| 6 | Email notifications | done |
+| 7 | Owner dashboard | done |
+| 8 | Deployment and polish | **next** |
 
 Detailed checklist and session-by-session log: **[PROGRESS.md](PROGRESS.md)**
+
+## How it works
+
+Three decisions carry most of the design:
+
+**Double-booking is prevented by the database, not the application.** A PostgreSQL
+exclusion constraint rejects any overlapping confirmed booking for a business. Checking in
+Python leaves a gap between the check and the insert, and under real concurrency two
+requests both pass. There is a test that fires ten simultaneous requests at one slot and
+asserts exactly one wins; with the constraint dropped, all ten do.
+
+**Two kinds of time, two column types.** Opening hours are recurring wall-clock patterns
+(`TIME`); bookings are absolute moments stored in UTC (`TIMESTAMPTZ`). `Business.timezone`
+converts between them at calculation time, which is why daylight saving needs no special
+case — the shop opens at 09:00 local all year.
+
+**The session lives in an httpOnly cookie.** A Next.js Server Action calls the API and
+writes the cookie, so the token never enters the browser's JavaScript. Signed in,
+`document.cookie` is an empty string.
+
+Full reasoning, including the decisions that were made against the obvious choice, is in
+[docs/data-model.md](docs/data-model.md) and the *Decisions* section of
+[PROGRESS.md](PROGRESS.md).
 
 ## Notes
 

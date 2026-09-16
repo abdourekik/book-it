@@ -1,0 +1,86 @@
+# Render blueprint: the API and the hourly reminder job.
+#
+# Render reads this file to create both services. The database is NOT defined here -
+# it lives on Supabase or Neon, so it survives independently of any deploy and can be
+# backed up and restored without touching this repo.
+#
+# Nothing secret is in this file. Every secret is marked `sync: false`, which tells
+# Render to prompt for it in the dashboard instead of reading it from git.
+
+services:
+  # ---------------------------------------------------------------- API
+  - type: web
+    name: book-it-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+
+    buildCommand: pip install -r requirements.txt
+
+    # Migrations run here, not in the build. A build runs before the new version is
+    # live and may run more than once; a preDeploy runs exactly once, immediately
+    # before traffic switches over, which is what schema changes need.
+    preDeployCommand: alembic upgrade head
+
+    # One worker on the free plan. --workers would fork more, each with its own
+    # connection pool, which the free Postgres connection limit will not tolerate.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+
+      # Prompted for in the Render dashboard, never stored in git.
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        # Render generates a strong random value on first deploy.
+        generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+
+      # The public URL of the Vercel frontend. Used to build the links inside emails,
+      # so a wrong value here sends customers to a dead page.
+      - key: APP_BASE_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+  # ------------------------------------------------------- reminder job
+  - type: cron
+    name: book-it-reminders
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+
+    # Hourly. The job selects appointments 23-25 hours out and stamps each row as it
+    # sends, so running every hour emails each customer exactly once - and a missed run
+    # is caught by the next one rather than silently skipping a day.
+    schedule: "0 * * * *"
+
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m scripts.send_reminders
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false

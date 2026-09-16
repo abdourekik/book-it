@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     # expires. Thirty minutes bounds the damage.
     access_token_expire_minutes: int = 30
 
+    # --- Email ---------------------------------------------------------------
+    # Optional. Without it the app logs emails instead of sending them, so the project
+    # runs locally with no account anywhere and the test suite never touches a network.
+    resend_api_key: SecretStr | None = None
+    email_from: str = "Book-it <onboarding@resend.dev>"
+
+    # Where the frontend lives. Used to build the links inside emails, so it must be the
+    # public URL in production, not localhost.
+    app_base_url: str = "http://localhost:3000"
+
 
 # Created once, when the app starts, and imported everywhere else.
 settings = Settings()

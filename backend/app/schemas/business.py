@@ -168,3 +168,32 @@ class TimeOffRead(BaseModel):
     starts_at: datetime
     ends_at: datetime
     reason: str | None
+
+
+class StatsRead(BaseModel):
+    """Figures for the owner dashboard, all computed in the business's timezone."""
+
+    bookings_this_week: int
+    bookings_next_7_days: int
+    cancellation_rate: float = Field(description="0.0 to 1.0, over all time")
+    busiest_weekday: str | None
+    total_bookings: int
+
+
+class OwnerBookingRead(BaseModel):
+    """A booking as the OWNER sees it.
+
+    Note what is missing compared with BookingRead: access_token. That token authorises
+    cancelling the booking, and it belongs to the customer. An owner cancelling should
+    go through an owner-authenticated route, not by holding the customer's secret.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    starts_at: datetime
+    ends_at: datetime
+    status: str
+    customer_name: str
+    customer_email: str
+    service_name: str

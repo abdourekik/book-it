@@ -9,11 +9,16 @@ only ever address their own business.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from dataclasses import asdict
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import delete, select
 
 from app.api.deps import CurrentOwner
 from app.db import DbSession
+from app.domain.stats import compute_stats
 from app.models import (
     AvailabilityRule,
     Booking,
@@ -28,9 +33,11 @@ from app.schemas.business import (
     BusinessCreate,
     BusinessRead,
     BusinessUpdate,
+    OwnerBookingRead,
     ServiceCreate,
     ServiceRead,
     ServiceUpdate,
+    StatsRead,
     TimeOffCreate,
     TimeOffRead,
     WeeklyAvailability,
@@ -288,3 +295,95 @@ def delete_time_off(time_off_id: int, db: DbSession, owner: CurrentOwner) -> Non
     # loses no history - it simply makes those hours bookable again.
     db.delete(time_off)
     db.commit()
+
+
+# ------------------------------------------------------ dashboard
+
+
+@router.get("/bookings", response_model=list[OwnerBookingRead], summary="Upcoming bookings")
+def upcoming_bookings(
+    db: DbSession,
+    owner: CurrentOwner,
+    days: Annotated[int, Query(ge=1, le=90, description="How far ahead to look")] = 7,
+) -> list[OwnerBookingRead]:
+    """Confirmed appointments in the next `days` days, soonest first."""
+    business = _my_business(db, owner)
+    now = datetime.now(UTC)
+
+    bookings = db.execute(
+        select(Booking)
+        .where(
+            Booking.business_id == business.id,
+            Booking.status == BookingStatus.CONFIRMED,
+            Booking.starts_at >= now,
+            Booking.starts_at < now + timedelta(days=days),
+        )
+        .order_by(Booking.starts_at)
+    ).scalars()
+
+    return [
+        OwnerBookingRead(
+            id=b.id,
+            starts_at=b.starts_at,
+            ends_at=b.ends_at,
+            status=b.status.value,
+            customer_name=b.customer_display_name,
+            customer_email=b.customer_email,
+            service_name=b.service.name,
+        )
+        for b in bookings
+    ]
+
+
+@router.get("/stats", response_model=StatsRead, summary="Dashboard statistics")
+def dashboard_stats(db: DbSession, owner: CurrentOwner) -> StatsRead:
+    business = _my_business(db, owner)
+    stats = compute_stats(db, business.id, business.timezone)
+    return StatsRead(**asdict(stats))
+
+
+@router.post(
+    "/bookings/{booking_id}/cancel",
+    response_model=OwnerBookingRead,
+    summary="Cancel a booking as the owner",
+)
+def owner_cancel_booking(booking_id: int, db: DbSession, owner: CurrentOwner) -> OwnerBookingRead:
+    """Cancel on the customer's behalf - an owner closing early, or an emergency.
+
+    Reached by booking id under the owner's own authentication, NOT by the customer's
+    access_token. The owner is authorised because the booking belongs to their business;
+    handing them the customer's secret would be a different, worse thing.
+    """
+    business = _my_business(db, owner)
+
+    booking = db.execute(
+        select(Booking).where(Booking.id == booking_id, Booking.business_id == business.id)
+    ).scalar_one_or_none()
+
+    if booking is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Booking not found")
+
+    if booking.status == BookingStatus.CANCELLED:
+        return _owner_booking(booking)
+
+    if booking.status != BookingStatus.CONFIRMED:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"A {booking.status.value} booking cannot be cancelled"
+        )
+
+    booking.status = BookingStatus.CANCELLED
+    db.commit()
+    db.refresh(booking)
+    return _owner_booking(booking)
+
+
+def _owner_booking(booking: Booking) -> OwnerBookingRead:
+    return OwnerBookingRead(
+        id=booking.id,
+        starts_at=booking.starts_at,
+        ends_at=booking.ends_at,
+        status=booking.status.value,
+        customer_name=booking.customer_display_name,
+        customer_email=booking.customer_email,
+        service_name=booking.service.name,
+    )

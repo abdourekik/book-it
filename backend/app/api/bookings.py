@@ -5,11 +5,14 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app import queries
-from app.api.deps import BearerToken, optional_user
+from app.api.deps import BearerToken, CurrentUser, optional_user
+from app.config import settings
+from app.core import email
 from app.db import DbSession
 from app.domain.availability import available_slots
 from app.models import Booking, BookingStatus, Business, Service
@@ -83,6 +86,11 @@ def _slots_for(
         bookings=queries.bookings_overlapping(db, business.id, start, end),
         time_off=queries.time_off_overlapping(db, business.id, start, end),
     )
+
+
+def manage_url(booking: Booking) -> str:
+    """The capability URL emailed to the customer."""
+    return f"{settings.app_base_url.rstrip('/')}/bookings/{booking.access_token}"
 
 
 def _as_read(booking: Booking) -> dict:
@@ -160,6 +168,7 @@ def create_booking(
     payload: BookingCreate,
     db: DbSession,
     credentials: BearerToken,
+    background: BackgroundTasks,
 ) -> dict:
     """Create a booking, for a logged-in customer or a guest.
 
@@ -226,6 +235,23 @@ def create_booking(
         raise HTTPException(status.HTTP_409_CONFLICT, reason) from exc
 
     db.refresh(booking)
+
+    # Queued, not awaited. FastAPI runs background tasks AFTER the response is sent, so
+    # a slow email provider cannot make the customer wait - and cannot fail a booking
+    # that is already committed.
+    background.add_task(
+        email.send,
+        email.booking_confirmation(
+            to=booking.customer_email,
+            customer_name=booking.customer_display_name,
+            business_name=business.name,
+            service_name=service.name,
+            starts_at=booking.starts_at,
+            timezone=business.timezone,
+            manage_url=manage_url(booking),
+        ),
+    )
+
     return _as_read(booking)
 
 
@@ -249,7 +275,7 @@ def get_booking(token: str, db: DbSession) -> dict:
 
 
 @router.post("/bookings/{token}/cancel", response_model=BookingRead, summary="Cancel a booking")
-def cancel_booking(token: str, db: DbSession) -> dict:
+def cancel_booking(token: str, db: DbSession, background: BackgroundTasks) -> dict:
     booking = _booking_or_404(db, token)
 
     if booking.status == BookingStatus.CANCELLED:
@@ -267,6 +293,20 @@ def cancel_booking(token: str, db: DbSession) -> dict:
     booking.status = BookingStatus.CANCELLED
     db.commit()
     db.refresh(booking)
+
+    background.add_task(
+        email.send,
+        email.booking_cancellation(
+            to=booking.customer_email,
+            customer_name=booking.customer_display_name,
+            business_name=booking.business.name,
+            service_name=booking.service.name,
+            starts_at=booking.starts_at,
+            timezone=booking.business.timezone,
+            booking_url=manage_url(booking),
+        ),
+    )
+
     return _as_read(booking)
 
 
@@ -322,3 +362,22 @@ def reschedule_booking(token: str, payload: BookingReschedule, db: DbSession) ->
 
     db.refresh(booking)
     return _as_read(booking)
+
+
+@router.get(
+    "/my/bookings",
+    response_model=list[BookingRead],
+    summary="My bookings (signed-in customers)",
+)
+def my_bookings(db: DbSession, user: CurrentUser) -> list[dict]:
+    """Every booking this customer made, soonest first.
+
+    Guest bookings cannot appear here - they have no customer_id, which is the trade
+    that came with allowing booking without an account. A guest's only handle is the
+    link they were emailed.
+    """
+    bookings = db.execute(
+        select(Booking).where(Booking.customer_id == user.id).order_by(Booking.starts_at.desc())
+    ).scalars()
+
+    return [_as_read(b) for b in bookings]

@@ -21,6 +21,12 @@ select = [
     "N",   # pep8-naming          - snake_case functions, PascalCase classes
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Email templates are inline-styled HTML, because that is the only styling email clients
+# reliably honour. Wrapping a style attribute across lines makes it harder to read, not
+# easier, so the line-length rule is lifted for this one file.
+"app/core/email.py" = ["E501"]
+
 [tool.ruff.lint.isort]
 # Tell ruff that `app` is our own code, so our imports sort into their own block
 # below third-party ones.
