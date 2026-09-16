@@ -20,12 +20,23 @@ services:
     plan: free
     rootDir: backend
 
-    buildCommand: pip install -r requirements.txt
-
-    # Migrations run here, not in the build. A build runs before the new version is
-    # live and may run more than once; a preDeploy runs exactly once, immediately
-    # before traffic switches over, which is what schema changes need.
-    preDeployCommand: alembic upgrade head
+    # Migrations run as part of the build, because preDeployCommand is a paid-tier
+    # feature on Render.
+    #
+    # The trade-off is real and worth knowing. A preDeploy runs exactly once, right
+    # before traffic switches to the new version. A build can run more than once, and
+    # runs before the new code is live - so for a brief moment the database schema is
+    # ahead of the code serving requests. With one instance and additive migrations
+    # (adding a column, adding a table) that is harmless. It stops being harmless for a
+    # migration that DROPS or RENAMES something the running code still uses.
+    #
+    # Two mitigations, neither of which costs anything:
+    #   * `alembic upgrade head` is idempotent - a second run is a no-op
+    #   * if the migration fails, the build fails and the previous version keeps serving
+    #
+    # When a destructive migration comes up, run it by hand from your laptop against the
+    # production database first, then deploy the code that depends on it.
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
 
     # One worker on the free plan. --workers would fork more, each with its own
     # connection pool, which the free Postgres connection limit will not tolerate.
