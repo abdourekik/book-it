@@ -40,11 +40,11 @@
 
 ### Phase 4: Booking logic (weeks 14-15)
 - [ ] Owners set weekly availability and time off
-- [ ] Available slots calculated for a given date and service
+- [x] Available slots calculated for a given date and service
 - [ ] Customers book, cancel, reschedule
 - [ ] Double-booking prevented (tested, including simultaneous requests)
-- [ ] Time zones handled, everything stored in UTC
-- [ ] Booking logic test coverage above 80%
+- [x] Time zones handled, everything stored in UTC (incl. daylight saving, tested)
+- [x] Booking logic test coverage above 80% (availability.py at 99%; project 95%)
 
 ### Phase 5: Frontend (weeks 16-17)
 - [ ] Public business page with service list and slot picker
@@ -82,6 +82,25 @@
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->
+
+**2026-09-16: available_slots() is a pure function; the database layer sits outside it.**
+It takes rules, bookings, and time off as arguments instead of querying for them, so the
+hardest logic in the project is testable with no database, no fixtures, and no mocking -
+32 tests run in 0.14s. Interval arithmetic is half-open `[start, end)` throughout, which
+is what lets a 09:30-10:00 booking sit against a 10:00-10:30 one without counting as
+overlapping. It matches the `tstzrange` semantics of the database exclusion constraint, so
+Python and PostgreSQL agree on what "taken" means.
+
+Daylight saving needs no special case: opening rules are stored as wall-clock TIME and
+converted to UTC per date, so the shop opens at 09:00 local all year. Verified across the
+25 October 2026 Paris transition - same local time, different UTC instant.
+
+Mutation testing found the suite's one real weakness. Six of seven deliberate bugs were
+caught; `Interval.overlaps` using `<=` instead of `<` was not, because overlaps() is only
+reached via minus(), which recomputes the right pieces anyway - an equivalent mutant. But
+booking creation (4.2) will call overlaps() directly, where that bug would reject every
+back-to-back appointment. Added seven boundary tests pinning the contract; all seven
+mutations are now caught.
 
 **2026-09-16: Authorisation reads the database, not the token's role claim.**
 `get_current_user` loads the User by id on every request rather than trusting the `role`
@@ -171,3 +190,6 @@ checklist items are left unticked on purpose — they are still genuine gaps, no
 
 ## LinkedIn ideas
 <!-- One line each: a bug, a lesson, a before/after, a screenshot worth sharing -->
+- Mutation testing on my booking engine: I broke my own code 7 ways on purpose to see if the tests noticed. They caught 6. The 7th taught me more than the 6 combined.
+- "Password authentication failed" - except the password was fine. Two processes were bound to the same port and I was talking to the wrong database entirely. When an error contradicts what you believe about the system, check the belief first.
+- Why my booking app stores "Tuesdays 09:00" as wall-clock time but appointments as UTC - and how that one distinction makes daylight saving a non-event.
