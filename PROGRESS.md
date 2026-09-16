@@ -34,9 +34,9 @@
 
 ### Phase 3: Authentication (week 13)
 - [x] Sign up and log in with hashed passwords
-- [x] JWT access tokens (issued on login; route protection is the next step)
-- [ ] Roles: business owner and customer
-- [ ] Auth tests
+- [x] JWT access tokens
+- [x] Roles: business owner and customer
+- [x] Auth tests (49 tests: hashing, JWT, signup, login, role protection)
 
 ### Phase 4: Booking logic (weeks 14-15)
 - [ ] Owners set weekly availability and time off
@@ -82,6 +82,20 @@
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->
+
+**2026-09-16: Authorisation reads the database, not the token's role claim.**
+`get_current_user` loads the User by id on every request rather than trusting the `role`
+claim inside the JWT. A token is a snapshot of who someone was at login; by the time it is
+used, the account may have been deleted or demoted, and a JWT cannot be revoked. Trusting
+the claim would give a demoted owner up to 30 more minutes of owner powers over other
+people's calendars. The cost is one indexed primary-key lookup per request. The `role`
+claim is kept so the frontend can render the right UI without an extra call, but it is
+never what the server authorises against. Tested: changing a role in the database takes
+effect on the very next request with the same token.
+
+401 and 403 are used distinctly: 401 means "credentials missing or invalid, try
+authenticating"; 403 means "we know who you are and the answer is still no". Retrying
+after a 401 can work; retrying a 403 cannot.
 
 **2026-09-16: Auth stack - argon2 for passwords, PyJWT for tokens.**
 argon2id rather than bcrypt (no 72-byte truncation limit) and rather than passlib (which

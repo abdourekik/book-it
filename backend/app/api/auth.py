@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
+from app.api.deps import CurrentUser
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db import DbSession
 from app.models.user import User
@@ -77,3 +78,14 @@ def login(payload: UserLogin, db: DbSession) -> Token:
         )
 
     return Token(access_token=create_access_token(subject=user.id, role=user.role.value))
+
+
+@router.get("/me", response_model=UserRead, summary="Who am I?")
+def me(user: CurrentUser) -> User:
+    """Return the account belonging to the bearer token.
+
+    The whole authentication check lives in that `CurrentUser` annotation. By the time
+    this body runs, the token has been verified and the user loaded - and there is no
+    path into this function that skips it.
+    """
+    return user

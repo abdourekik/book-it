@@ -83,7 +83,7 @@ def create_access_token(
 
     payload: dict[str, Any] = {
         "sub": str(subject),  # who this token is about
-        "role": role,  # saves a database lookup on every request
+        "role": role,  # for the frontend to render with; the server re-checks the database
         "iat": now,  # issued at
         "exp": expire,  # expires at - PyJWT enforces this on decode
     }
