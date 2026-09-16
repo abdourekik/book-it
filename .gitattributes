@@ -1,0 +1,20 @@
+# Line endings.
+#
+# Git on Windows defaults to converting LF to CRLF on checkout, which is where those
+# "LF will be replaced by CRLF" warnings come from. Left alone it causes diffs that
+# show every line as changed when a Windows and a Linux machine touch the same file.
+#
+# This pins LF everywhere - in the repository AND in the working copy. Python, YAML,
+# and shell scripts all prefer it, and CI runs on Linux.
+* text=auto eol=lf
+
+# Windows-only scripts genuinely need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Never touch these.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
