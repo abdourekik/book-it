@@ -8,6 +8,7 @@ Docker locally and Supabase in production.
 
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/config.py -> backend/app -> backend
@@ -34,6 +35,21 @@ class Settings(BaseSettings):
 
     # Required. Format: postgresql+psycopg://user:password@host:port/dbname
     database_url: str
+
+    # --- Authentication -------------------------------------------------------
+    # Required, with no default on purpose. A default secret is worse than no secret:
+    # it ships to production unnoticed, and anyone who has read the source can mint a
+    # token claiming to be any user. SecretStr keeps it from appearing in logs or
+    # tracebacks - printing the settings object shows "**********".
+    secret_key: SecretStr
+
+    # Pinned server-side rather than read from the token. A token that declares its own
+    # algorithm can declare "none", which is a classic forgery attack.
+    jwt_algorithm: str = "HS256"
+
+    # Short-lived on purpose: a JWT cannot be revoked, so a stolen one is valid until it
+    # expires. Thirty minutes bounds the damage.
+    access_token_expire_minutes: int = 30
 
 
 # Created once, when the app starts, and imported everywhere else.

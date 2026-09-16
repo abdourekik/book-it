@@ -23,6 +23,10 @@ jobs:
       # the current tests never open a connection. When Phase 2 adds tests that really
       # query the database, this gets replaced by a `services: postgres:` block.
       DATABASE_URL: postgresql+psycopg://bookit:bookit@localhost:5432/bookit
+      # A throwaway signing key for the test run only. It is safe in plain sight
+      # precisely because it is not the production key - that one lives in Render's
+      # environment settings and is never written down in this repository.
+      SECRET_KEY: ci-only-not-a-real-secret-key-0123456789abcdef
 
     steps:
       - name: Check out the code
