@@ -43,44 +43,57 @@ services:
       - key: SECRET_KEY
         # Render generates a strong random value on first deploy.
         generateValue: true
-      - key: RESEND_API_KEY
-        sync: false
-
       # The public URL of the Vercel frontend. Used to build the links inside emails,
-      # so a wrong value here sends customers to a dead page.
+      # so a wrong value here sends customers to a dead page. Set a placeholder on the
+      # first deploy and correct it once Vercel has given you a URL.
       - key: APP_BASE_URL
         sync: false
-      - key: EMAIL_FROM
-        sync: false
+
+      # RESEND_API_KEY and EMAIL_FROM are deliberately NOT declared here.
+      #
+      # Both have working defaults in app/config.py: with no API key the app logs emails
+      # instead of sending them, which is exactly what you want before email is set up.
+      # Add them in the Render dashboard (Environment tab) when you configure Resend -
+      # a blueprint that demands values you do not have yet just blocks the first deploy.
 
   # ------------------------------------------------------- reminder job
-  - type: cron
-    name: book-it-reminders
-    runtime: python
-    region: frankfurt
-    plan: free
-    rootDir: backend
+  #
+  # COMMENTED OUT FOR THE FIRST DEPLOY, for two reasons:
+  #   1. Render cron jobs are not included in the free tier.
+  #   2. Without RESEND_API_KEY the job logs instead of sending, so it would do nothing.
+  #
+  # Uncomment the whole block once you have set up Resend and are ready to pay for a
+  # cron instance, or run the same command from any external scheduler:
+  #     python -m scripts.send_reminders
+  #
+  # # ------------------------------------------------------- reminder job
+  # - type: cron
+  #   name: book-it-reminders
+  #   runtime: python
+  #   region: frankfurt
+  #   plan: free
+  #   rootDir: backend
 
-    # Hourly. The job selects appointments 23-25 hours out and stamps each row as it
-    # sends, so running every hour emails each customer exactly once - and a missed run
-    # is caught by the next one rather than silently skipping a day.
-    schedule: "0 * * * *"
+  #   # Hourly. The job selects appointments 23-25 hours out and stamps each row as it
+  #   # sends, so running every hour emails each customer exactly once - and a missed run
+  #   # is caught by the next one rather than silently skipping a day.
+  #   schedule: "0 * * * *"
 
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m scripts.send_reminders
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: python -m scripts.send_reminders
 
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.12"
-      - key: ENVIRONMENT
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: SECRET_KEY
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: APP_BASE_URL
-        sync: false
-      - key: EMAIL_FROM
-        sync: false
+  #   envVars:
+  #     - key: PYTHON_VERSION
+  #       value: "3.12"
+  #     - key: ENVIRONMENT
+  #       value: production
+  #     - key: DATABASE_URL
+  #       sync: false
+  #     - key: SECRET_KEY
+  #       sync: false
+  #     - key: RESEND_API_KEY
+  #       sync: false
+  #     - key: APP_BASE_URL
+  #       sync: false
+  #     - key: EMAIL_FROM
+  #       sync: false
