@@ -39,16 +39,16 @@
 - [x] Auth tests (49 tests: hashing, JWT, signup, login, role protection)
 
 ### Phase 4: Booking logic (weeks 14-15)
-- [ ] Owners set weekly availability and time off
+- [x] Owners set weekly availability and time off
 - [x] Available slots calculated for a given date and service
 - [x] Customers book, cancel, reschedule
 - [x] Double-booking prevented (tested, including simultaneous requests)
 - [x] Time zones handled, everything stored in UTC (incl. daylight saving, tested)
-- [x] Booking logic test coverage above 80% (availability.py 99%; project 93%, 102 tests)
+- [x] Booking logic test coverage above 80% (availability.py 99%; project 95%, 127 tests)
 
 ### Phase 5: Frontend (weeks 16-17)
 - [ ] Public business page with service list and slot picker
-- [ ] Customer sign up, log in, and "my bookings" page
+- [ ] Customer sign up, log in, and "my bookings" page (sign up + log in done; my bookings to do)
 - [ ] Owner pages: services and availability management
 - [ ] Mobile-friendly layout, loading and error states
 
@@ -82,6 +82,46 @@
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->
+
+**2026-09-16: The frontend stores the session in an httpOnly cookie, not localStorage.**
+localStorage is what most tutorials use and it is why one XSS bug becomes full account
+takeover: any injected script can read the token and send it anywhere. An httpOnly cookie
+is invisible to JavaScript entirely. Our API returns the token in a JSON body, so a Next.js
+Server Action does the bridging - the form posts to server code, which calls FastAPI and
+writes the cookie, and the token never enters the browser's JavaScript at any point.
+
+Verified in the running app rather than assumed: while signed in, `document.cookie` is the
+empty string and both localStorage and sessionStorage are empty objects. With localStorage
+that first value would have printed the access token.
+
+Side benefit: because the frontend calls FastAPI from the server, there is no cross-origin
+request and therefore no CORS configuration to get wrong. `sameSite=lax` covers the CSRF
+exposure that cookies would otherwise introduce. `src/lib/session.ts` starts with
+`import "server-only"`, so if a client component ever imports it the build fails instead of
+quietly shipping token-handling code to the browser.
+
+Two Next.js 16 rules cost a build failure and are worth remembering: a `"use server"` file
+may export ONLY async functions (a plain exported object is a build error, because every
+export becomes a callable server endpoint), and `redirect()` must be called OUTSIDE a
+try/catch because it works by throwing - inside, the catch swallows it and the redirect
+silently never happens.
+
+**2026-09-16: Owner endpoints are addressed as /me/..., never /businesses/{id}/...**
+Every owner route reaches the business through the authenticated user rather than an id in
+the URL. A route shaped `/businesses/{id}/services` has to remember an ownership check on
+every handler, and eventually one will not have it. With `/me/services` there is nothing
+to forget - an owner can only ever address their own business. Where an id is unavoidable
+(a service id), a wrong one returns 404 rather than 403, so ids cannot be enumerated.
+
+Weekly hours are replaced wholesale with PUT /me/availability rather than per-rule CRUD.
+An owner thinks "these are my hours", not "delete rule 7"; sending the complete set makes
+the update atomic, so a half-applied schedule cannot exist.
+
+Time off that clashes with a confirmed booking is refused with 409. Availability changes
+are not checked the same way, and the asymmetry is deliberate: narrowing opening hours only
+affects what is offered in future, while time off is an explicit claim to be absent - and
+accepting it would leave the owner committed to an appointment and away at the same time,
+with the customer finding out at a closed door.
 
 **2026-09-16: Double-booking is prevented by the database constraint, not by row locking.**
 Two options were weighed. `SELECT ... FOR UPDATE` works but is a discipline that must be
@@ -215,6 +255,7 @@ checklist items are left unticked on purpose — they are still genuine gaps, no
 
 ## LinkedIn ideas
 <!-- One line each: a bug, a lesson, a before/after, a screenshot worth sharing -->
+- Signed into my app, opened the console, typed `document.cookie` — empty string. localStorage — empty. Yet I'm logged in. That's the difference between storing a JWT in localStorage and in an httpOnly cookie, and it's the difference between one XSS bug being annoying and being account takeover.
 - I wrote a test that fires 10 simultaneous requests at the same appointment slot. Exactly one wins. Then I dropped the database constraint and re-ran it: all 10 won. That's the difference between code that looks correct and code that is.
 - The concurrency test found a bug I'd never have reasoned my way to: under load, PostgreSQL rejects the losers with a DEADLOCK, not a constraint violation. My handler only caught the latter, so those users would have seen a 500.
 - Mutation testing on my booking engine: I broke my own code 7 ways on purpose to see if the tests noticed. They caught 6. The 7th taught me more than the 6 combined.
