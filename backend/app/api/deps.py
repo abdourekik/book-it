@@ -9,6 +9,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.db import DbSession
@@ -80,6 +81,32 @@ def get_current_user(credentials: BearerToken, db: DbSession) -> User:
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def optional_user(credentials: HTTPAuthorizationCredentials | None, db: Session) -> User | None:
+    """The caller if they are signed in, or None if they are not.
+
+    For endpoints open to both - booking works with an account or as a guest. A missing
+    or invalid token means "treat this as a guest", not "reject the request", so this
+    returns None where get_current_user would raise.
+
+    A plain function rather than a dependency, because it is called from inside an
+    endpoint that has already decided it needs both branches.
+    """
+    if credentials is None:
+        return None
+
+    claims = decode_access_token(credentials.credentials)
+    if claims is None:
+        return None
+
+    subject = claims.get("sub")
+    try:
+        user_id = int(subject)
+    except (TypeError, ValueError):
+        return None
+
+    return db.get(User, user_id)
 
 
 def require_role(*allowed: UserRole):

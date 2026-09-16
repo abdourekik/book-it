@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import CheckConstraint, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -63,6 +64,16 @@ class Business(Base, TimestampMixin):
         back_populates="business", cascade="all, delete-orphan"
     )
     bookings: Mapped[list[Booking]] = relationship(back_populates="business")
+
+    @property
+    def tzinfo(self) -> ZoneInfo:
+        """The timezone as an object, ready for .astimezone().
+
+        Parsed on each access rather than cached: ZoneInfo keeps its own internal cache,
+        so this is cheap, and a cached attribute would go stale if an owner corrected
+        their timezone.
+        """
+        return ZoneInfo(self.timezone)
 
     def __repr__(self) -> str:
         return f"<Business id={self.id} slug={self.slug!r} tz={self.timezone}>"

@@ -41,10 +41,10 @@
 ### Phase 4: Booking logic (weeks 14-15)
 - [ ] Owners set weekly availability and time off
 - [x] Available slots calculated for a given date and service
-- [ ] Customers book, cancel, reschedule
-- [ ] Double-booking prevented (tested, including simultaneous requests)
+- [x] Customers book, cancel, reschedule
+- [x] Double-booking prevented (tested, including simultaneous requests)
 - [x] Time zones handled, everything stored in UTC (incl. daylight saving, tested)
-- [x] Booking logic test coverage above 80% (availability.py at 99%; project 95%)
+- [x] Booking logic test coverage above 80% (availability.py 99%; project 93%, 102 tests)
 
 ### Phase 5: Frontend (weeks 16-17)
 - [ ] Public business page with service list and slot picker
@@ -82,6 +82,31 @@
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->
+
+**2026-09-16: Double-booking is prevented by the database constraint, not by row locking.**
+Two options were weighed. `SELECT ... FOR UPDATE` works but is a discipline that must be
+reapplied at every write site forever, and it serialises all bookings for a business
+including non-conflicting ones. The exclusion constraint cannot be forgotten, only fails
+actual conflicts, and also protects against writes that never pass through this code.
+Python still checks availability first, but only for a friendly message - correctness
+comes from PostgreSQL.
+
+Proved rather than assumed: 10 threads on 10 real connections, released together by a
+threading.Barrier, all inserting the same slot. Exactly one wins. With the constraint
+dropped, all ten won - ten people booked the same haircut - so the test has real teeth.
+
+That test found a genuine production bug. Under concurrent conflicting inserts,
+PostgreSQL often aborts the losers with **deadlock_detected (40P01)** rather than an
+exclusion violation, because each transaction waits to learn whether the others commit
+and the waits form a cycle. The endpoint caught only IntegrityError, so those requests
+would have returned 500 instead of a clean 409. Now both IntegrityError and the transient
+SQLSTATE codes (40P01, 40001) map to 409. Note the cost: deadlock detection takes about a
+second per cycle, which makes this the slowest test in the suite at up to ~10s.
+
+Guests cancel and reschedule through a capability URL - the random `access_token` from the
+booking row. An unknown token returns 404 rather than 403, because confirming that a token
+exists but belongs to someone else would help an attacker guess them. Cancelling twice
+returns 200 rather than an error, so clicking the emailed link twice is harmless.
 
 **2026-09-16: available_slots() is a pure function; the database layer sits outside it.**
 It takes rules, bookings, and time off as arguments instead of querying for them, so the
@@ -190,6 +215,8 @@ checklist items are left unticked on purpose — they are still genuine gaps, no
 
 ## LinkedIn ideas
 <!-- One line each: a bug, a lesson, a before/after, a screenshot worth sharing -->
+- I wrote a test that fires 10 simultaneous requests at the same appointment slot. Exactly one wins. Then I dropped the database constraint and re-ran it: all 10 won. That's the difference between code that looks correct and code that is.
+- The concurrency test found a bug I'd never have reasoned my way to: under load, PostgreSQL rejects the losers with a DEADLOCK, not a constraint violation. My handler only caught the latter, so those users would have seen a 500.
 - Mutation testing on my booking engine: I broke my own code 7 ways on purpose to see if the tests noticed. They caught 6. The 7th taught me more than the 6 combined.
 - "Password authentication failed" - except the password was fine. Two processes were bound to the same port and I was talking to the wrong database entirely. When an error contradicts what you believe about the system, check the belief first.
 - Why my booking app stores "Tuesdays 09:00" as wall-clock time but appointments as UTC - and how that one distinction makes daylight saving a non-event.
