@@ -14,13 +14,17 @@ from app.api.deps import BearerToken, CurrentUser, optional_user
 from app.config import settings
 from app.core import email
 from app.db import DbSession
+from app.domain import directory
 from app.domain.availability import available_slots
-from app.models import Booking, BookingStatus, Business, Service
+from app.models import Booking, BookingStatus, Business, BusinessCategory, Service
 from app.schemas.booking import (
     BookingCreate,
     BookingRead,
     BookingReschedule,
+    BusinessCard,
+    BusinessList,
     BusinessPublic,
+    CategoryCount,
     SlotList,
 )
 
@@ -111,6 +115,59 @@ def _as_read(booking: Booking) -> dict:
     }
 
 
+@router.get("/businesses", response_model=BusinessList, summary="Browse businesses")
+def browse_businesses(
+    db: DbSession,
+    q: Annotated[
+        str | None, Query(max_length=80, description="Search name and description")
+    ] = None,
+    category: Annotated[BusinessCategory | None, Query()] = None,
+    city: Annotated[str | None, Query(max_length=80)] = None,
+    limit: Annotated[int, Query(ge=1, le=directory.MAX_LIMIT)] = directory.DEFAULT_LIMIT,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> BusinessList:
+    """The public directory. No login needed - this is the front door.
+
+    An unknown `category` is rejected by FastAPI as a 422 rather than quietly returning
+    nothing, so a typo in a link is loud instead of looking like an empty city.
+    """
+    cards = directory.list_businesses(
+        db, q=q, category=category, city=city, limit=limit, offset=offset
+    )
+    return BusinessList(
+        items=[BusinessCard.model_validate(card) for card in cards],
+        total=directory.count_businesses(db, q=q, category=category, city=city),
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get(
+    "/businesses/categories",
+    response_model=list[CategoryCount],
+    summary="Categories that have businesses in them",
+)
+def list_categories(
+    db: DbSession,
+    city: Annotated[str | None, Query(max_length=80)] = None,
+) -> list[CategoryCount]:
+    """Declared BEFORE /businesses/{slug} on purpose.
+
+    FastAPI matches routes in declaration order. The other way round, a request for
+    /businesses/categories would match the slug route and look for a business called
+    "categories".
+    """
+    return [
+        CategoryCount(category=category, count=count)
+        for category, count in directory.category_counts(db, city=city)
+    ]
+
+
+@router.get("/businesses/cities", response_model=list[str], summary="Cities that have businesses")
+def list_cities(db: DbSession) -> list[str]:
+    return directory.cities(db)
+
+
 @router.get(
     "/businesses/{slug}",
     response_model=BusinessPublic,
@@ -128,6 +185,9 @@ def get_business(slug: str, db: DbSession) -> BusinessPublic:
         timezone=business.timezone,
         description=business.description,
         slot_interval_minutes=business.slot_interval_minutes,
+        category=business.category,
+        city=business.city,
+        image_url=business.image_url,
         # Retired services are filtered out here. The owner still sees them in
         # /me/services so they can bring one back; a customer never should.
         services=[s for s in business.services if s.is_active],

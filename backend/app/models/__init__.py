@@ -14,7 +14,7 @@ So: every new model gets added here.
 from app.models.availability_rule import AvailabilityRule
 from app.models.base import Base
 from app.models.booking import Booking, BookingStatus
-from app.models.business import Business
+from app.models.business import Business, BusinessCategory
 from app.models.service import Service
 from app.models.time_off import TimeOff
 from app.models.user import User, UserRole
@@ -25,6 +25,7 @@ __all__ = [
     "Booking",
     "BookingStatus",
     "Business",
+    "BusinessCategory",
     "Service",
     "TimeOff",
     "User",

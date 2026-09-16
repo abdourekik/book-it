@@ -9,7 +9,28 @@ from zoneinfo import ZoneInfo, available_timezones
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.models.business import BusinessCategory
+
 SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def _validate_image_url(value: str | None) -> str | None:
+    """Only accept an absolute http(s) URL.
+
+    A relative path or a `javascript:` string would be rendered into an <img src> on a
+    public page, so this is a small but real injection surface. Rejecting anything that
+    is not http(s) closes it, and also catches the common mistake of pasting a file path
+    from one's own computer.
+    """
+    if value is None or not value.strip():
+        return None
+
+    value = value.strip()
+    if not value.startswith(("http://", "https://")):
+        raise ValueError("image_url must start with http:// or https://")
+    if len(value) > 2000:
+        raise ValueError("image_url is too long")
+    return value
 
 
 def _validate_timezone(value: str) -> str:
@@ -34,6 +55,21 @@ class BusinessCreate(BaseModel):
     timezone: str
     description: str | None = None
     slot_interval_minutes: int = Field(default=1, ge=1, le=240)
+
+    category: BusinessCategory = BusinessCategory.OTHER
+    city: str | None = Field(default=None, max_length=80)
+    image_url: str | None = None
+    is_listed: bool = True
+
+    @field_validator("image_url")
+    @classmethod
+    def check_image_url(cls, value: str | None) -> str | None:
+        return _validate_image_url(value)
+
+    @field_validator("city")
+    @classmethod
+    def tidy_city(cls, value: str | None) -> str | None:
+        return value.strip() or None if value else None
 
     @field_validator("slug")
     @classmethod
@@ -62,10 +98,20 @@ class BusinessUpdate(BaseModel):
     description: str | None = None
     slot_interval_minutes: int | None = Field(default=None, ge=1, le=240)
 
+    category: BusinessCategory | None = None
+    city: str | None = Field(default=None, max_length=80)
+    image_url: str | None = None
+    is_listed: bool | None = None
+
     @field_validator("timezone")
     @classmethod
     def check_timezone(cls, value: str | None) -> str | None:
         return None if value is None else _validate_timezone(value)
+
+    @field_validator("image_url")
+    @classmethod
+    def check_image_url(cls, value: str | None) -> str | None:
+        return _validate_image_url(value)
 
 
 class BusinessRead(BaseModel):
@@ -77,6 +123,10 @@ class BusinessRead(BaseModel):
     timezone: str
     description: str | None
     slot_interval_minutes: int
+    category: BusinessCategory
+    city: str | None
+    image_url: str | None
+    is_listed: bool
 
 
 class ServiceCreate(BaseModel):

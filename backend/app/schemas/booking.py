@@ -8,6 +8,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.models.booking import BookingStatus
+from app.models.business import BusinessCategory
 
 
 class SlotList(BaseModel):
@@ -79,6 +80,52 @@ class ServiceSummary(BaseModel):
     currency: str
 
 
+class BusinessCard(BaseModel):
+    """One business as it appears in the directory listing.
+
+    Deliberately smaller than BusinessPublic: no service list. A page showing 24
+    businesses should not carry every service of every one of them - that is the
+    difference between a fast directory and a slow one. `from_price` gives the customer
+    the one number they want at a glance.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    slug: str
+    category: BusinessCategory
+    city: str | None
+    image_url: str | None
+    description: str | None
+    from_price: Decimal | None
+    currency: str | None
+    service_count: int
+
+
+class BusinessList(BaseModel):
+    """A page of directory results.
+
+    `total` is the count before paging, which is what lets the page say "24 of 137" and
+    render the right number of page links.
+    """
+
+    items: list[BusinessCard]
+    total: int
+    limit: int
+    offset: int
+
+
+class CategoryCount(BaseModel):
+    """A category and how many listed businesses are in it.
+
+    Counts are returned so the UI can avoid rendering a filter chip that leads to an
+    empty page - "Dentist (0)" looks broken.
+    """
+
+    category: BusinessCategory
+    count: int
+
+
 class BusinessPublic(BaseModel):
     """What the public booking page needs to render.
 
@@ -96,6 +143,9 @@ class BusinessPublic(BaseModel):
     timezone: str
     description: str | None
     slot_interval_minutes: int
+    category: BusinessCategory
+    city: str | None
+    image_url: str | None
     services: list[ServiceSummary]
 
 

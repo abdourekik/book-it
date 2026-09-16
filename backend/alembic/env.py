@@ -54,7 +54,17 @@ def run_migrations_online() -> None:
     """Connect to the database and run the migrations."""
     # create_engine directly rather than engine_from_config: the URL then never passes
     # through configparser, which would treat a `%` in a password as an escape character.
-    connectable = create_engine(settings.database_url, poolclass=pool.NullPool)
+    #
+    # The connect timeout matters more here than it looks. Without it, running a
+    # migration against a database that is simply not there - a stopped container, a
+    # wrong host, a VPN down - hangs indefinitely with no output. Ten seconds and a
+    # clear error is the difference between a typo and a lost afternoon. The app's own
+    # engine in app/db.py does the same thing for the same reason.
+    connectable = create_engine(
+        settings.database_url,
+        poolclass=pool.NullPool,
+        connect_args={"connect_timeout": 10},
+    )
 
     with connectable.connect() as connection:
         context.configure(

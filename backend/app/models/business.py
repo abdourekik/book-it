@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -16,6 +17,24 @@ if TYPE_CHECKING:
     from app.models.service import Service
     from app.models.time_off import TimeOff
     from app.models.user import User
+
+
+class BusinessCategory(StrEnum):
+    """What kind of business this is - the directory's primary filter.
+
+    An enum rather than free text on purpose. Left open, "Barber", "barber" and
+    "barbershop" become three categories within a week and the filter stops being
+    useful. Adding a category later is a migration, which is the point: the list stays
+    deliberate rather than accumulating by accident.
+    """
+
+    BARBER = "barber"
+    SALON = "salon"
+    CLINIC = "clinic"
+    DENTIST = "dentist"
+    TUTOR = "tutor"
+    FITNESS = "fitness"
+    OTHER = "other"
 
 
 class Business(Base, TimestampMixin):
@@ -49,6 +68,30 @@ class Business(Base, TimestampMixin):
     slot_interval_minutes: Mapped[int] = mapped_column(default=1, server_default="1")
 
     description: Mapped[str | None] = mapped_column(Text, default=None)
+
+    # --- Directory listing ----------------------------------------------------
+    category: Mapped[BusinessCategory] = mapped_column(
+        Enum(
+            BusinessCategory,
+            name="business_category",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        default=BusinessCategory.OTHER,
+        server_default=BusinessCategory.OTHER.value,
+        index=True,
+    )
+
+    # Free text for now. A proper places table with coordinates is a different project;
+    # for a directory covering a handful of cities, a matched string is enough.
+    city: Mapped[str | None] = mapped_column(String(80), default=None, index=True)
+
+    # A URL, never image bytes. Bytes in Postgres bloat every backup and turn loading a
+    # photo into a database query.
+    image_url: Mapped[str | None] = mapped_column(Text, default=None)
+
+    # Whether this business appears in the public directory. False keeps the original
+    # behaviour - reachable only by someone who has the /b/<slug> link.
+    is_listed: Mapped[bool] = mapped_column(default=True, server_default="true", index=True)
 
     owner: Mapped[User] = relationship(back_populates="business")
 
