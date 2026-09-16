@@ -383,3 +383,38 @@ def test_only_one_of_many_simultaneous_bookings_succeeds(engine):
         cleanup.query(User).filter(User.id == owner_id).delete()
         cleanup.commit()
         cleanup.close()
+
+
+# ------------------------------------------------- public business page
+
+
+def test_the_public_page_lists_the_business_and_its_services(client, shop):
+    response = client.get(f"/businesses/{SLUG}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Test Barber"
+    assert body["timezone"] == PARIS
+    assert [s["name"] for s in body["services"]] == ["Haircut"]
+
+
+def test_the_public_page_hides_retired_services(client, shop, db):
+    shop["service"].is_active = False
+    db.commit()
+
+    response = client.get(f"/businesses/{SLUG}")
+
+    assert response.json()["services"] == []
+
+
+def test_the_public_page_exposes_no_internal_fields(client, shop):
+    """The one schema served to strangers, so worth asserting what is absent."""
+    body = client.get(f"/businesses/{SLUG}").json()
+
+    assert "id" not in body
+    assert "owner_id" not in body
+    assert "owner" not in body
+
+
+def test_an_unknown_business_page_is_404(client, shop):
+    assert client.get("/businesses/no-such-shop").status_code == 404

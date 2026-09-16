@@ -138,6 +138,7 @@ Start from `backend/.env.example`. **`.env` is gitignored and must never be comm
 | `GET` `POST` `PATCH` `DELETE` | `/me/services` | owners |
 | `GET` `PUT` | `/me/availability` | owners |
 | `GET` `POST` `DELETE` | `/me/time-off` | owners |
+| `GET` | `/businesses/{slug}` | anyone |
 
 Full interactive docs at `/docs` when the server is running.
 
@@ -190,7 +191,7 @@ Vercel, with migrations run as a release step.
 | 2 | Data model and migrations | done |
 | 3 | Authentication and roles | done |
 | 4 | Availability and booking logic | done |
-| 5 | Frontend | next |
+| 5 | Frontend | in progress |
 | 6 | Email notifications | planned |
 | 7 | Owner dashboard | planned |
 | 8 | Deployment and polish | planned |

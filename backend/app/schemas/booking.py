@@ -79,6 +79,26 @@ class ServiceSummary(BaseModel):
     currency: str
 
 
+class BusinessPublic(BaseModel):
+    """What the public booking page needs to render.
+
+    Deliberately narrow: no owner, no id, no internal fields. This is the one schema
+    served to people who are not logged in, so it is the one most worth keeping tight.
+
+    Defined after ServiceSummary on purpose - the reference then points backwards and
+    needs no quoted forward declaration.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    slug: str
+    timezone: str
+    description: str | None
+    slot_interval_minutes: int
+    services: list[ServiceSummary]
+
+
 class BookingRead(BaseModel):
     """What the API returns for a booking.
 

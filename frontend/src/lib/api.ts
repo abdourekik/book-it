@@ -109,6 +109,15 @@ export type Service = {
   currency: string;
 };
 
+export type BusinessPublic = {
+  name: string;
+  slug: string;
+  timezone: string;
+  description: string | null;
+  slot_interval_minutes: number;
+  services: Service[];
+};
+
 export type SlotList = {
   business_slug: string;
   service_id: number;
@@ -144,6 +153,9 @@ export const api = {
     request<Token>("/auth/login", { method: "POST", body }),
 
   me: (token: string) => request<User>("/auth/me", { token }),
+
+  business: (slug: string) =>
+    request<BusinessPublic>(`/businesses/${encodeURIComponent(slug)}`),
 
   slots: (slug: string, serviceId: number, date: string) =>
     request<SlotList>(

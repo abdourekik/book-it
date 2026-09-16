@@ -13,7 +13,13 @@ from app.api.deps import BearerToken, optional_user
 from app.db import DbSession
 from app.domain.availability import available_slots
 from app.models import Booking, BookingStatus, Business, Service
-from app.schemas.booking import BookingCreate, BookingRead, BookingReschedule, SlotList
+from app.schemas.booking import (
+    BookingCreate,
+    BookingRead,
+    BookingReschedule,
+    BusinessPublic,
+    SlotList,
+)
 
 router = APIRouter(tags=["bookings"])
 
@@ -95,6 +101,29 @@ def _as_read(booking: Booking) -> dict:
         "customer_name": booking.customer_display_name,
         "customer_email": booking.customer_email,
     }
+
+
+@router.get(
+    "/businesses/{slug}",
+    response_model=BusinessPublic,
+    summary="A business and the services it offers",
+)
+def get_business(slug: str, db: DbSession) -> BusinessPublic:
+    """Public - this is the page a customer lands on from a shared link."""
+    business = queries.get_business_by_slug(db, slug)
+    if business is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Business not found")
+
+    return BusinessPublic(
+        name=business.name,
+        slug=business.slug,
+        timezone=business.timezone,
+        description=business.description,
+        slot_interval_minutes=business.slot_interval_minutes,
+        # Retired services are filtered out here. The owner still sees them in
+        # /me/services so they can bring one back; a customer never should.
+        services=[s for s in business.services if s.is_active],
+    )
 
 
 @router.get(

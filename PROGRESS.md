@@ -47,8 +47,8 @@
 - [x] Booking logic test coverage above 80% (availability.py 99%; project 95%, 127 tests)
 
 ### Phase 5: Frontend (weeks 16-17)
-- [ ] Public business page with service list and slot picker
-- [ ] Customer sign up, log in, and "my bookings" page (sign up + log in done; my bookings to do)
+- [x] Public business page with service list and slot picker
+- [ ] Customer sign up, log in, and "my bookings" page (sign up, log in, and per-booking page done; a list of my bookings still to do)
 - [ ] Owner pages: services and availability management
 - [ ] Mobile-friendly layout, loading and error states
 
@@ -82,6 +82,31 @@
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->
+
+**2026-09-16: The slot picker keeps its state in the URL, not in React.**
+First version fetched slots in a useEffect and called setState. The linter rejected it
+(react-hooks/set-state-in-effect) and it was right - the App Router has a better answer.
+Service and date now live in the query string, so the Server Component renders the slot
+list itself: the times arrive with the HTML, there is no loading spinner, API_BASE_URL is
+never sent to the browser, the URL is shareable, the back button works, and the whole
+class of stale-response races disappears because nothing is fetched on change. Only the
+date input and the confirm form are Client Components.
+
+Two rendering rules that look contradictory but are not: the slot picker formats times in
+the BUSINESS's timezone (a customer in London booking a Paris barber must see the time the
+barber expects them), while the confirmation page formats in the VISITOR's timezone and
+locale (their own calendar, their own language). Verified live - the confirmation rendered
+"mardi 22 septembre 2026" on a French browser.
+
+The full journey was exercised in a real browser, not assumed: choose service, choose day,
+pick 09:00, book as a guest, land on the capability URL, cancel, and confirm the slot
+returned to the list. The seeded bookings show through correctly too - 09:30 jumps to
+10:30 around an existing 10:00 appointment, 10:30 itself is offered (back-to-back works),
+and 11:30 jumps to 14:00 across the lunch break.
+
+The "every free minute" decision is now visible: 254 buttons for one 30-minute service on
+one day. The grid is capped with overflow scrolling so it stays usable, but if it feels
+wrong in practice, raising slot_interval_minutes to 15 is a config change.
 
 **2026-09-16: The frontend stores the session in an httpOnly cookie, not localStorage.**
 localStorage is what most tutorials use and it is why one XSS bug becomes full account
