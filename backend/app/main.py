@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 
+from app.api import auth
 from app.config import settings
 
 app = FastAPI(
@@ -9,6 +10,9 @@ app = FastAPI(
     version="0.1.0",
     description="Appointment booking for small businesses.",
 )
+
+# Each area of the API lives in its own router and is attached here.
+app.include_router(auth.router)
 
 
 @app.get("/health", tags=["system"])

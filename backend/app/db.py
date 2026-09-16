@@ -1,7 +1,9 @@
 """Database engine, sessions, and the FastAPI dependency that hands them out."""
 
 from collections.abc import Generator
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -50,3 +52,11 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+# The dependency, packaged as a type. An endpoint writes `db: DbSession` and gets a
+# session - shorter than repeating `Depends(get_db)` everywhere, and it avoids putting a
+# function call in an argument default, which is a genuine Python trap: defaults are
+# evaluated once at import time, not per call. FastAPI handles Depends() specially so
+# the old style worked, but Annotated is the current idiom and reads better.
+DbSession = Annotated[Session, Depends(get_db)]

@@ -25,6 +25,9 @@ select = [
 # Tell ruff that `app` is our own code, so our imports sort into their own block
 # below third-party ones.
 known-first-party = ["app"]
+# Without this, ruff sees the backend/alembic/ directory and assumes `import alembic`
+# refers to it rather than to the installed package, and sorts it into the wrong block.
+known-third-party = ["alembic"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

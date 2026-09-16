@@ -33,8 +33,8 @@
 - [x] Data model diagram in docs/
 
 ### Phase 3: Authentication (week 13)
-- [ ] Sign up and log in with hashed passwords
-- [ ] JWT access tokens
+- [x] Sign up and log in with hashed passwords
+- [x] JWT access tokens (issued on login; route protection is the next step)
 - [ ] Roles: business owner and customer
 - [ ] Auth tests
 
@@ -82,6 +82,32 @@
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->
+
+**2026-09-16: Auth stack - argon2 for passwords, PyJWT for tokens.**
+argon2id rather than bcrypt (no 72-byte truncation limit) and rather than passlib (which
+has known friction with modern bcrypt releases). PyJWT rather than python-jose, which is
+better maintained. `SECRET_KEY` is a required setting with no default: a default secret
+ships to production unnoticed and lets anyone who read the source mint a token for any
+user. It is a pydantic `SecretStr`, so it shows as `**********` in logs and tracebacks.
+
+A test caught a real bug: `verify_password` caught `VerifyMismatchError`, but a malformed
+argon2 hash raises its PARENT class `VerificationError`. In production that would have
+turned a login into a 500 rather than a clean 401 - both a crash and a signal that
+something is unusual about that specific account.
+
+Login returns one identical response for "no such email" and "wrong password", and hashes
+a dummy value when the user does not exist so the two paths take similar time. Different
+responses (or response times) turn the endpoint into an account-enumeration oracle, which
+for a booking app reveals who is a customer of which business.
+
+**2026-09-16: Tests run against a real PostgreSQL, not SQLite.**
+`tests/conftest.py` derives a `bookit_test` database from `DATABASE_URL`, creates it if
+absent, and builds it with the real Alembic migrations rather than `create_all()` - so
+drift between models and migrations fails the tests instead of hiding. Each test runs
+inside a transaction that is rolled back afterwards, so tests are isolated without paying
+to recreate the schema. CI gained a `services: postgres` block for the same reason:
+SQLite cannot reproduce the exclusion constraint that Phase 4 depends on, so testing
+against it would prove nothing about the behaviour that matters most.
 
 **2026-09-16: Alembic reads DATABASE_URL from app settings, not alembic.ini.**
 The generated `alembic.ini` ships with a hardcoded `sqlalchemy.url`. That line is commented

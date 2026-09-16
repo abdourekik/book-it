@@ -11,6 +11,26 @@ jobs:
     name: Backend (lint + tests)
     runs-on: ubuntu-latest
 
+    # A real PostgreSQL for the test run. The auth tests exercise unique constraints and
+    # transactions, which SQLite would not reproduce faithfully - and the booking
+    # exclusion constraint in Phase 4 has no SQLite equivalent at all. Test against the
+    # database you deploy on.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bookit
+          POSTGRES_PASSWORD: bookit
+          POSTGRES_DB: bookit
+        ports:
+          - 5432:5432
+        # The job must not start running tests before the database can answer.
+        options: >-
+          --health-cmd "pg_isready -U bookit -d bookit"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     defaults:
       run:
         # Every `run:` step below starts in backend/, so the commands match exactly
@@ -19,9 +39,9 @@ jobs:
 
     env:
       # config.py requires DATABASE_URL and refuses to start without it. CI has no .env
-      # file (it is gitignored, correctly), so we supply the value here. Nothing secret:
-      # the current tests never open a connection. When Phase 2 adds tests that really
-      # query the database, this gets replaced by a `services: postgres:` block.
+      # file (it is gitignored, correctly), so we supply the value here. It points at
+      # the `postgres` service above. The test suite derives its own `bookit_test`
+      # database from this URL and migrates it with Alembic.
       DATABASE_URL: postgresql+psycopg://bookit:bookit@localhost:5432/bookit
       # A throwaway signing key for the test run only. It is safe in plain sight
       # precisely because it is not the production key - that one lives in Render's

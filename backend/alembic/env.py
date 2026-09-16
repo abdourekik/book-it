@@ -12,9 +12,8 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from sqlalchemy import create_engine, pool
-
 from alembic import context
+from sqlalchemy import create_engine, pool
 
 # Make `app` importable when alembic runs from the backend/ folder.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
