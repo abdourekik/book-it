@@ -27,8 +27,8 @@
 - [x] README skeleton
 
 ### Phase 2: Data model (weeks 11-12)
-- [ ] Models: User, Business, Service, AvailabilityRule, Booking
-- [ ] Alembic migrations working
+- [x] Models: User, Business, Service, AvailabilityRule, Booking (+ TimeOff)
+- [x] Alembic migrations working
 - [ ] Seed script with sample data
 - [x] Data model diagram in docs/
 
@@ -82,6 +82,21 @@
 
 ## Decisions
 <!-- Example: YYYY-MM-DD: Chose SQLAlchemy over raw SQL because... -->
+
+**2026-09-16: Alembic reads DATABASE_URL from app settings, not alembic.ini.**
+The generated `alembic.ini` ships with a hardcoded `sqlalchemy.url`. That line is commented
+out and `alembic/env.py` imports `app.config.settings` instead, so there is one source of
+truth and no password is ever committed. `env.py` also uses `create_engine` directly rather
+than `engine_from_config`, because the latter routes the URL through configparser, where a
+`%` in a password is treated as an escape character.
+
+Autogenerate captured the ExcludeConstraint correctly but missed two things that had to be
+added by hand: `CREATE EXTENSION IF NOT EXISTS btree_gist` in `upgrade()` (without it the
+constraint fails with "data type integer has no default operator class for access method
+gist"), and dropping the `user_role` and `booking_status` enum types in `downgrade()`
+(`drop_table` leaves them behind, so a second upgrade failed with "type already exists").
+Verified by a full upgrade -> downgrade -> upgrade round trip, then a drift check that
+generated an empty migration.
 
 **2026-09-16: Data model decisions (see docs/data-model.md).**
 Four choices settled before writing any models. (1) Single role per user for v1 — a barber
