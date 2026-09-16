@@ -1,11 +1,15 @@
-# Render blueprint: the API and the hourly reminder job.
+# Render blueprint: the Book-it API.
 #
-# Render reads this file to create both services. The database is NOT defined here -
-# it lives on Supabase or Neon, so it survives independently of any deploy and can be
-# backed up and restored without touching this repo.
+# Render reads this file and creates the web service described below. The reminder cron
+# job is defined at the bottom but commented out for the first deploy - see the note
+# there.
 #
-# Nothing secret is in this file. Every secret is marked `sync: false`, which tells
-# Render to prompt for it in the dashboard instead of reading it from git.
+# The database is NOT defined here. It lives on Supabase, so it survives independently of
+# any deploy and can be backed up and restored without touching this repo.
+#
+# Nothing secret is in this file. Secrets are either marked `sync: false`, which makes
+# Render prompt for them in the dashboard, or `generateValue: true`, which makes Render
+# invent one. Neither ends up in git.
 
 services:
   # ---------------------------------------------------------------- API
