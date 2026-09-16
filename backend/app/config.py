@@ -8,7 +8,7 @@ Docker locally and Supabase in production.
 
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/config.py -> backend/app -> backend
@@ -35,6 +35,30 @@ class Settings(BaseSettings):
 
     # Required. Format: postgresql+psycopg://user:password@host:port/dbname
     database_url: str
+
+    @field_validator("database_url")
+    @classmethod
+    def use_psycopg3(cls, value: str) -> str:
+        """Normalise the URL so it always names the driver we actually install.
+
+        Hosting providers hand out plain `postgresql://...` (and Heroku-style
+        `postgres://...`). SQLAlchemy reads a bare `postgresql://` as "use psycopg2",
+        which is not installed here - we use psycopg 3. The result is a deploy that
+        fails with `ModuleNotFoundError: No module named 'psycopg2'`, an error that says
+        nothing about the real problem being one missing word in a connection string.
+
+        Rewriting it here means you can paste a provider's string unchanged and it
+        works. An explicit `postgresql+psycopg://` is left alone, as is any other
+        driver someone deliberately chose.
+        """
+        if value.startswith("postgres://"):
+            # Heroku and a few others still use this older scheme.
+            value = "postgresql://" + value[len("postgres://") :]
+
+        if value.startswith("postgresql://"):
+            value = "postgresql+psycopg://" + value[len("postgresql://") :]
+
+        return value
 
     # --- Authentication -------------------------------------------------------
     # Required, with no default on purpose. A default secret is worse than no secret:

@@ -138,3 +138,31 @@ def test_secret_key_is_not_printable():
     """SecretStr keeps the signing key out of logs and tracebacks."""
     assert "**" in str(settings.secret_key)
     assert settings.secret_key.get_secret_value() not in str(settings.secret_key)
+
+
+# ------------------------------------------------------- settings
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        # What hosting providers actually hand you.
+        ("postgresql://u:p@h:5432/d", "postgresql+psycopg://u:p@h:5432/d"),
+        # Heroku's older scheme.
+        ("postgres://u:p@h:5432/d", "postgresql+psycopg://u:p@h:5432/d"),
+        # Already correct - must not be mangled into a double prefix.
+        ("postgresql+psycopg://u:p@h:5432/d", "postgresql+psycopg://u:p@h:5432/d"),
+        # A driver someone chose on purpose is left alone.
+        ("postgresql+asyncpg://u:p@h:5432/d", "postgresql+asyncpg://u:p@h:5432/d"),
+    ],
+    ids=["plain", "heroku scheme", "already explicit", "other driver"],
+)
+def test_database_url_names_the_installed_driver(given, expected):
+    """A bare postgresql:// means psycopg2 to SQLAlchemy, which we do not install.
+
+    Getting this wrong produces `ModuleNotFoundError: No module named 'psycopg2'` at
+    deploy time - an error that points nowhere near the actual cause.
+    """
+    from app.config import Settings
+
+    assert Settings(database_url=given, secret_key="x" * 32).database_url == expected
